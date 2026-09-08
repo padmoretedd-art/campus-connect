@@ -1,6 +1,6 @@
 {
   "name": "Campus Connect",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bullseye",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bookworm",
   "features": {
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
   },
