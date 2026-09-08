@@ -1,0 +1,32 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Institution {
+  id          String   @id @default(uuid())
+  name        String
+  county      String
+  logoUrl     String?
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  emailDomains InstitutionEmailDomain[]
+
+  @@map("institutions")
+}
+
+model InstitutionEmailDomain {
+  id            String      @id @default(uuid())
+  domain        String      @unique
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+
+  @@map("institution_email_domains")
+}
