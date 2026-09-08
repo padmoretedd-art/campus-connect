@@ -1,0 +1,13 @@
+{
+  "name": "campus-connect",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {},
+  "engines": {
+    "node": "20.x"
+  }
+}
