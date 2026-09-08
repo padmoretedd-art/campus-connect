@@ -1,9 +1,6 @@
 {
   "name": "Campus Connect",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bullseye",
-  "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
-  },
   "postCreateCommand": "node --version && npm --version",
   "customizations": {
     "vscode": {
