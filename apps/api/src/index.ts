@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import { institutionRoutes } from "./routes/institutions.js";
+import { authRoutes } from "./routes/auth.js";
 
 const app = Fastify({
   logger: true,
@@ -16,7 +17,6 @@ app.setErrorHandler((error, request, reply) => {
     });
   }
 
-  // Prisma known-error codes: https://www.prisma.io/docs/orm/reference/error-reference
   const prismaCode = (error as { code?: string }).code;
 
   if (prismaCode === "P2002") {
@@ -47,6 +47,7 @@ app.get("/health", async () => {
 });
 
 app.register(institutionRoutes);
+app.register(authRoutes);
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 

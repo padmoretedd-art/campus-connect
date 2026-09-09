@@ -6,6 +6,13 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserRole {
+  STUDENT
+  MODERATOR
+  ADMIN
+  SUPER_ADMIN
+}
+
 model Institution {
   id          String   @id @default(uuid())
   name        String
@@ -17,6 +24,7 @@ model Institution {
   updatedAt   DateTime @updatedAt
 
   emailDomains InstitutionEmailDomain[]
+  users        User[]
 
   @@map("institutions")
 }
@@ -29,4 +37,54 @@ model InstitutionEmailDomain {
   createdAt     DateTime    @default(now())
 
   @@map("institution_email_domains")
+}
+
+model User {
+  id              String   @id @default(uuid())
+  fullName        String
+  email           String   @unique
+  passwordHash    String
+  course          String
+  yearOfStudy     Int
+  role            UserRole @default(STUDENT)
+  isEmailVerified Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Restrict)
+
+  emailVerifications EmailVerification[]
+  sessions            Session[]
+
+  @@map("users")
+}
+
+model EmailVerification {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_verifications")
+}
+
+model Session {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  userAgent String?
+  ipAddress String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
 }
