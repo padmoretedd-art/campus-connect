@@ -13,6 +13,7 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
+    "@campus-connect/database": "^0.1.0",
     "fastify": "^5.12.3"
   }
 }
