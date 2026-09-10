@@ -1,9 +1,27 @@
 import Fastify from "fastify";
+import cookie from "@fastify/cookie";
+import rateLimit from "@fastify/rate-limit";
 import { institutionRoutes } from "./routes/institutions.js";
 import { authRoutes } from "./routes/auth.js";
+import { sessionRoutes } from "./routes/session.js";
 
 const app = Fastify({
   logger: true,
+});
+
+const cookieSecret = process.env.COOKIE_SECRET;
+if (!cookieSecret) {
+  throw new Error("COOKIE_SECRET environment variable is not set.");
+}
+
+await app.register(cookie, {
+  secret: cookieSecret,
+});
+
+await app.register(rateLimit, {
+  global: true,
+  max: 100,
+  timeWindow: "1 minute",
 });
 
 app.setErrorHandler((error, request, reply) => {
@@ -35,6 +53,14 @@ app.setErrorHandler((error, request, reply) => {
     });
   }
 
+  if (error.statusCode === 429) {
+    return reply.code(429).send({
+      error: "Too Many Requests",
+      message: "Too many requests. Please try again later.",
+      requestId: request.id,
+    });
+  }
+
   return reply.code(500).send({
     error: "Internal Server Error",
     message: "Something went wrong.",
@@ -48,6 +74,7 @@ app.get("/health", async () => {
 
 app.register(institutionRoutes);
 app.register(authRoutes);
+app.register(sessionRoutes);
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 

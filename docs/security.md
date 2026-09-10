@@ -20,3 +20,10 @@ To be completed as the project develops.
   requiring Node >=22 (EBADENGINE); we are pinned to Node 20 LTS.
   Non-fatal (npm install still succeeds), and we do not use Prisma's
   streams feature. Re-check when planning any future Node upgrade.
+
+- `cookie@2.0.1` (transitive dep of `@fastify/cookie`) warns requiring
+  Node >=22 (EBADENGINE). Verified it loads and functions correctly on
+  Node 20.19.2 via direct require test. Unlike the Prisma streams
+  warning above, this package IS in the production request path
+  (cookie parsing on every request), so re-verify this specifically
+  when planning any Node upgrade or before final production deploy.
