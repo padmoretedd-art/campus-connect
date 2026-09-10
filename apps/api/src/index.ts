@@ -4,6 +4,7 @@ import rateLimit from "@fastify/rate-limit";
 import { institutionRoutes } from "./routes/institutions.js";
 import { authRoutes } from "./routes/auth.js";
 import { sessionRoutes } from "./routes/session.js";
+import { accountRoutes } from "./routes/account.js";
 
 const app = Fastify({
   logger: true,
@@ -75,6 +76,7 @@ app.get("/health", async () => {
 app.register(institutionRoutes);
 app.register(authRoutes);
 app.register(sessionRoutes);
+app.register(accountRoutes);
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 
