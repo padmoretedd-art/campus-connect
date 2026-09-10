@@ -37,6 +37,29 @@ const verifyEmailSchema = {
   },
 };
 
+const forgotPasswordSchema = {
+  body: {
+    type: "object",
+    required: ["email"],
+    additionalProperties: false,
+    properties: {
+      email: { type: "string", format: "email", maxLength: 254 },
+    },
+  },
+};
+
+const resetPasswordSchema = {
+  body: {
+    type: "object",
+    required: ["token", "newPassword"],
+    additionalProperties: false,
+    properties: {
+      token: { type: "string", minLength: 1, maxLength: 256 },
+      newPassword: { type: "string", minLength: 8, maxLength: 128 },
+    },
+  },
+};
+
 function extractDomain(email: string): string {
   const parts = email.toLowerCase().split("@");
   return parts.length === 2 ? parts[1] : "";
@@ -172,6 +195,108 @@ export async function authRoutes(app: FastifyInstance) {
       ]);
 
       return reply.code(200).send({ message: "Email verified successfully." });
+    },
+  );
+
+  app.post(
+    "/auth/forgot-password",
+    {
+      schema: forgotPasswordSchema,
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: "15 minutes",
+        },
+      },
+    },
+    async (request, reply) => {
+      const { email } = request.body as { email: string };
+      const normalizedEmail = email.toLowerCase();
+
+      const genericResponse = () =>
+        reply.code(200).send({
+          message:
+            "If this email is registered, a password reset link has been sent.",
+        });
+
+      const user = await prisma.user.findUnique({
+        where: { email: normalizedEmail },
+      });
+
+      if (!user || !user.isActive) {
+        return genericResponse();
+      }
+
+      const rawToken = generateToken();
+      const tokenHash = hashToken(rawToken);
+      const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1h
+
+      await prisma.passwordReset.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          expiresAt,
+        },
+      });
+
+      request.log.info(
+        { userId: user.id, resetToken: rawToken },
+        "DEVELOPMENT MODE: password reset token (would be emailed)",
+      );
+
+      return genericResponse();
+    },
+  );
+
+  app.post(
+    "/auth/reset-password",
+    { schema: resetPasswordSchema },
+    async (request, reply) => {
+      const { token, newPassword } = request.body as {
+        token: string;
+        newPassword: string;
+      };
+      const tokenHash = hashToken(token);
+
+      const genericError = () =>
+        reply.code(400).send({
+          error: "Bad Request",
+          message: "This reset link is invalid or has expired.",
+          requestId: request.id,
+        });
+
+      const reset = await prisma.passwordReset.findUnique({
+        where: { tokenHash },
+      });
+
+      if (!reset || reset.usedAt || reset.expiresAt < new Date()) {
+        return genericError();
+      }
+
+      const newPasswordHash = await argon2.hash(newPassword, {
+        type: argon2.argon2id,
+      });
+
+      await prisma.$transaction([
+        prisma.passwordReset.update({
+          where: { id: reset.id },
+          data: { usedAt: new Date() },
+        }),
+        prisma.user.update({
+          where: { id: reset.userId },
+          data: { passwordHash: newPasswordHash },
+        }),
+        // Revoke all existing sessions: a password reset should also
+        // invalidate any session an attacker may already hold.
+        prisma.session.updateMany({
+          where: { userId: reset.userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        }),
+      ]);
+
+      return reply
+        .code(200)
+        .send({ message: "Password has been reset successfully." });
     },
   );
 }
