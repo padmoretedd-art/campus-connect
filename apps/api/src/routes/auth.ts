@@ -26,6 +26,17 @@ const registerSchema = {
   },
 };
 
+const verifyEmailSchema = {
+  body: {
+    type: "object",
+    required: ["token"],
+    additionalProperties: false,
+    properties: {
+      token: { type: "string", minLength: 1, maxLength: 256 },
+    },
+  },
+};
+
 function extractDomain(email: string): string {
   const parts = email.toLowerCase().split("@");
   return parts.length === 2 ? parts[1] : "";
@@ -72,11 +83,6 @@ export async function authRoutes(app: FastifyInstance) {
       });
     }
 
-    // Hash unconditionally, before checking whether the user already
-    // exists, so both branches below take approximately the same amount
-    // of time. This prevents a timing side-channel that would otherwise
-    // let an attacker distinguish "new account" from "already exists"
-    // even though both return an identical response body.
     const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
 
     const existingUser = await prisma.user.findUnique({
@@ -113,9 +119,6 @@ export async function authRoutes(app: FastifyInstance) {
       },
     });
 
-    // DEVELOPMENT ONLY: real email delivery is not yet configured.
-    // We log the raw token instead of emailing it. This branch must be
-    // replaced before production per Section 58 (no fake features).
     request.log.info(
       { userId: user.id, verificationToken: rawToken },
       "DEVELOPMENT MODE: email verification token (would be emailed)",
@@ -126,4 +129,49 @@ export async function authRoutes(app: FastifyInstance) {
         "If this email is eligible, a verification link has been sent.",
     });
   });
+
+  app.post(
+    "/auth/verify-email",
+    { schema: verifyEmailSchema },
+    async (request, reply) => {
+      const { token } = request.body as { token: string };
+      const tokenHash = hashToken(token);
+
+      const genericError = () =>
+        reply.code(400).send({
+          error: "Bad Request",
+          message: "This verification link is invalid or has expired.",
+          requestId: request.id,
+        });
+
+      const verification = await prisma.emailVerification.findUnique({
+        where: { tokenHash },
+      });
+
+      if (!verification) {
+        return genericError();
+      }
+
+      if (verification.usedAt) {
+        return genericError();
+      }
+
+      if (verification.expiresAt < new Date()) {
+        return genericError();
+      }
+
+      await prisma.$transaction([
+        prisma.emailVerification.update({
+          where: { id: verification.id },
+          data: { usedAt: new Date() },
+        }),
+        prisma.user.update({
+          where: { id: verification.userId },
+          data: { isEmailVerified: true },
+        }),
+      ]);
+
+      return reply.code(200).send({ message: "Email verified successfully." });
+    },
+  );
 }
