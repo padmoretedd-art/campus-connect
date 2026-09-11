@@ -60,3 +60,32 @@ export async function requireAuth(
   };
   request.currentSessionTokenHash = tokenHash;
 }
+
+/**
+ * Must run after requireAuth in the preHandler chain. Returns a 403 if
+ * the authenticated user's role is not in the allowed set. Does NOT
+ * itself check authentication — requireAuth already returns 401 and
+ * short-circuits the chain if there is no valid session.
+ */
+export function requireRole(allowedRoles: readonly string[]) {
+  return async function checkRole(
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<void> {
+    if (!request.currentUser) {
+      return reply.code(401).send({
+        error: "Unauthorized",
+        message: "Authentication required.",
+        requestId: request.id,
+      });
+    }
+
+    if (!allowedRoles.includes(request.currentUser.role)) {
+      return reply.code(403).send({
+        error: "Forbidden",
+        message: "You do not have permission to perform this action.",
+        requestId: request.id,
+      });
+    }
+  };
+}

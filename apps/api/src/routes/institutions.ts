@@ -1,5 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@campus-connect/database";
+import { requireAuth, requireRole } from "../lib/auth.js";
+
+const ADMIN_ROLES = ["ADMIN", "SUPER_ADMIN"] as const;
 
 const createInstitutionSchema = {
   body: {
@@ -54,7 +57,10 @@ const updateInstitutionSchema = {
 export async function institutionRoutes(app: FastifyInstance) {
   app.post(
     "/institutions",
-    { schema: createInstitutionSchema },
+    {
+      schema: createInstitutionSchema,
+      preHandler: [requireAuth, requireRole(ADMIN_ROLES)],
+    },
     async (request, reply) => {
       const { name, county, logoUrl, description, emailDomains } =
         request.body as {
@@ -82,6 +88,7 @@ export async function institutionRoutes(app: FastifyInstance) {
     },
   );
 
+  // Publicly readable: students need to see institutions to register.
   app.get(
     "/institutions",
     { schema: listInstitutionsSchema },
@@ -107,21 +114,24 @@ export async function institutionRoutes(app: FastifyInstance) {
 
   app.patch(
     "/institutions/:id",
-    { schema: updateInstitutionSchema },
+    {
+      schema: updateInstitutionSchema,
+      preHandler: [requireAuth, requireRole(ADMIN_ROLES)],
+    },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const updates = request.body as Record<string, unknown>;
 
-      try {
-        const institution = await prisma.institution.update({
-          where: { id },
-          data: updates,
-          include: { emailDomains: true },
-        });
-        return institution;
-      } catch {
-        return reply.code(404).send({ error: "Institution not found." });
-      }
+      // Let Prisma's P2025 (record not found) propagate to the central
+      // error handler instead of catching it here, so the response
+      // shape (including requestId) stays consistent with every other
+      // route in the app.
+      const institution = await prisma.institution.update({
+        where: { id },
+        data: updates,
+        include: { emailDomains: true },
+      });
+      return institution;
     },
   );
 }
